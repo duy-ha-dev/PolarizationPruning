@@ -38,7 +38,7 @@ import torch.nn.init as init
 import numpy as np
 from torch.autograd import Variable
 
-__all__ = ['ResNetExpand', 'BasicBlock', 'resnet56']
+__all__ = ['ResNetExpand', 'BasicBlock', 'resnet56', 'resnet20']
 
 from models.common import SparseGate, prune_conv_layer, compute_conv_flops_weight, BuildingBlock, Identity
 
@@ -515,8 +515,16 @@ class ResNetExpand(nn.Module):
         return self._use_input_mask
 
 
-def resnet20(num_classes):
-    return ResNetExpand(BasicBlock, [3, 3, 3], num_classes)
+def resnet20(num_classes, bn_init_value=1.0, cfg=None, aux_fc=False, gate=False, expand_idx=None, width_multiplier=1.,
+             use_input_mask=False):
+    return ResNetExpand(BasicBlock, [3, 3, 3],
+                        cfg=cfg,
+                        num_classes=num_classes,
+                        bn_init_value=bn_init_value,
+                        aux_fc=aux_fc,
+                        gate=gate, expand_idx=expand_idx,
+                        width_multiplier=width_multiplier,
+                        use_input_mask=use_input_mask)
 
 
 def resnet32(num_classes):
@@ -580,8 +588,10 @@ def _check_models(model, ref_model, threshold=1e-5):
 
 def test_gate():
     # test the forward pass
-    ref_model = resnet56(num_classes=10, bn_init_value=0.5, aux_fc=False, gate=False)
-    gate_model = resnet56(num_classes=10, bn_init_value=0.5, aux_fc=False, gate=True)
+    # ref_model = resnet56(num_classes=10, bn_init_value=0.5, aux_fc=False, gate=False)
+    # gate_model = resnet56(num_classes=10, bn_init_value=0.5, aux_fc=False, gate=True)
+    ref_model = resnet20(num_classes=10, bn_init_value=0.5, aux_fc=False, gate=False)
+    gate_model = resnet20(num_classes=10, bn_init_value=0.5, aux_fc=False, gate=True)
 
     assert _check_models(gate_model, ref_model, threshold=1e-5), f"The diff is too large"
 
@@ -597,14 +607,18 @@ def test(net):
 
 
 def test_flops_weight():
-    model = resnet56(num_classes=10, bn_init_value=0.5, aux_fc=False, gate=True)
+    # model = resnet56(num_classes=10, bn_init_value=0.5, aux_fc=False, gate=True)
+    model = resnet20(num_classes=10, bn_init_value=0.5, aux_fc=False, gate=True)
     flops_weight = compute_conv_flops_weight(model, BasicBlock)
     pass
 
 
 def _test_width_multiplier():
-    model = resnet56(10)
-    model_multiplier = resnet56(10, width_multiplier=1.)
+    # model = resnet56(10)
+    # model_multiplier = resnet56(10, width_multiplier=1.)
+    model = resnet20(10)
+    model_multiplier = resnet20(10, width_multiplier=1.)
+    
 
     model.eval()
     model_multiplier.eval()
@@ -622,7 +636,8 @@ def _test_width_multiplier():
     import math
     for multi in [0.5, 0.555555, math.pi, 1 / math.pi, 0.0001]:
         print(f"Testing width multiplier with multiplier {multi}")
-        model = resnet56(10, width_multiplier=multi)
+        # model = resnet56(10, width_multiplier=multi)
+        model = resnet20(10, width_multiplier=multi)
         model(rand_input)
 
     print("Width multiplier: Test pass!")

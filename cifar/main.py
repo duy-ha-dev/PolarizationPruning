@@ -123,7 +123,7 @@ if __name__ == '__main__':
             raise ValueError("--fix-gate should be with --gate.")
 
     if args.flops_weighted:
-        if args.arch not in {'resnet56', 'vgg16_linear'}:
+        if args.arch not in {'resnet56', 'vgg16_linear', 'resnet20'}:
             raise ValueError(f"Unsupported architecture {args.arch}")
 
     if not args.flops_weighted and (args.weight_max is not None or args.weight_min is not None):
@@ -220,6 +220,24 @@ if __name__ == '__main__':
         checkpoint = torch.load(args.retrain)
         if args.arch == "resnet56":
             model = models.resnet_expand.resnet56(cfg=checkpoint['cfg'], num_classes=num_classes,
+                                                aux_fc=False)
+            # initialize corresponding masks
+            if "bn3_masks" in checkpoint:
+                bn3_masks = checkpoint["bn3_masks"]
+                bottleneck_modules = list(filter(lambda m: isinstance(m[1], BasicBlock), model.named_modules()))
+                assert len(bn3_masks) == len(bottleneck_modules)
+                for i, (name, m) in enumerate(bottleneck_modules):
+                    if isinstance(m, BasicBlock):
+                        if isinstance(m.expand_layer, Identity):
+                            continue
+                        mask = bn3_masks[i]
+                        assert mask[1].shape[0] == m.expand_layer.idx.shape[0]
+                        m.expand_layer.idx = np.argwhere(mask[1].clone().cpu().numpy()).squeeze().reshape(-1)
+            else:
+                raise NotImplementedError("Key bn3_masks expected in checkpoint.")
+                
+        elif args.arch == "resnet20":
+            model = models.resnet_expand.resnet20(cfg=checkpoint['cfg'], num_classes=num_classes,
                                                 aux_fc=False)
             # initialize corresponding masks
             if "bn3_masks" in checkpoint:
@@ -484,6 +502,16 @@ if __name__ == '__main__':
             saved_model_fixed = prune_resnet(sparse_model=model, pruning_strategy='fixed',
                                             sanity_check=False, prune_mode=prune_mode, num_classes=num_classes)
             baseline_model = resnet50_expand(num_classes=num_classes, gate=False, aux_fc=False)
+        
+        elif arch == "resnet20":
+            from resprune_gate import prune_resnet
+            from models.resnet_expand import resnet20 as resnet20_expand
+            saved_model_grad = prune_resnet(sparse_model=model, pruning_strategy='grad',
+                                            sanity_check=False, prune_mode=prune_mode, num_classes=num_classes)
+            saved_model_fixed = prune_resnet(sparse_model=model, pruning_strategy='fixed',
+                                            sanity_check=False, prune_mode=prune_mode, num_classes=num_classes)
+            baseline_model = resnet20_expand(num_classes=num_classes, gate=False, aux_fc=False)
+
         elif arch == 'vgg16_linear':
             from vggprune_gate import prune_vgg
             from models import vgg16_linear
