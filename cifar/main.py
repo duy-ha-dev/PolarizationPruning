@@ -20,6 +20,7 @@ import models
 from common import LossType, compute_conv_flops
 from models.common import SparseGate, Identity
 from models.resnet_expand import BasicBlock
+import ipdb 
 
 #Main Guard for Windows-Modified by Duy Ha 6/11/2021
 if __name__ == '__main__':
@@ -327,7 +328,7 @@ if __name__ == '__main__':
                                 {'params': list(wd_params), 'weight_decay': args.weight_decay}],
                                 args.lr,
                                 momentum=args.momentum)
-
+    ipdb.set_trace()
     if args.debug:
         # fake polarization to test pruning
         for name, module in model.named_modules():
